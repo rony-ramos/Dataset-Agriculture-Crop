@@ -4,10 +4,12 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <chrono>
 #include "DatasetReader.cpp"
 #include "Queue.cpp"
 #include "HashTable.cpp"
 #include "BST.cpp"
+#include "AVL.cpp"
 #include "Stack.cpp"
 
 using namespace std;
@@ -272,46 +274,114 @@ public:
         size_t k;
         cin >> k;
         
-        cout << "\nBuscando los " << k << " registros mas cercanos a " << x 
-             << " en la variable: " << selectedVar << endl;
-        cout << "Usando: BST para almacenar registros y Pila (nodos) para recuperar K mas cercanos" << endl;
+        // COMPARAR ESTRUCTURAS: BST vs AVL
+        cout << "\n=== SELECCION DE ESTRUCTURA DE DATOS ===" << endl;
+        cout << "1. BST (Arbol Binario Simple) - O(N log N) promedio, O(N^2) peor caso" << endl;
+        cout << "2. AVL (Arbol Auto-Balanceado) + Arreglo - O(N log N) garantizado" << endl;
+        cout << "Seleccione la estructura (1 o 2): ";
+        int structChoice;
+        cin >> structChoice;
         
-        // Construir BST con los registros
-        BST<Row> bst;
-        size_t validRows = 0;
-        
-        reader.rows().for_each([&](const Row& row) {
-            string field;
-            if (row.getField(colIndex, field) && !field.empty()) {
-                try {
-                    double value = stod(field);
-                    bst.insert(value, row);
-                    ++validRows;
-                } catch (...) {
-                    // Ignorar valores no numéricos
-                }
-            }
-        });
-        
-        if (validRows == 0) {
-            cout << "No se encontraron valores numericos validos en la columna seleccionada." << endl;
-            return;
+        if (structChoice != 1 && structChoice != 2) {
+            cout << "Seleccion invalida. Usando AVL por defecto." << endl;
+            structChoice = 2;
         }
         
-        // Encontrar los K más cercanos usando LinkedList
-        LinkedList<Row> closest;
-        bst.findKClosest(x, k, closest);
+        cout << "\nBuscando los " << k << " registros mas cercanos a " << x 
+             << " en la variable: " << selectedVar << endl;
+        
+        LinkedList<const Row*> closest;
+        size_t validRows = 0;
+        
+        // Medir tiempo total (construcción + búsqueda)
+        auto startTotal = chrono::high_resolution_clock::now();
+        
+        if (structChoice == 1) {
+            // ===== OPCION 1: BST SIMPLE =====
+            cout << "Estructura: BST (Arbol Binario Simple)" << endl;
+            cout << "Algoritmo: Merge Sort O(N log N)" << endl;
+            
+            BST<const Row*> bst;
+            
+            // Construir BST
+            auto startBuild = chrono::high_resolution_clock::now();
+            reader.rows().for_each([&](const Row& row) {
+                string field;
+                if (row.getField(colIndex, field) && !field.empty()) {
+                    try {
+                        double value = stod(field);
+                        bst.insert(value, &row);
+                        ++validRows;
+                    } catch (...) {}
+                }
+            });
+            auto endBuild = chrono::high_resolution_clock::now();
+            
+            if (validRows == 0) {
+                cout << "No se encontraron valores numericos validos." << endl;
+                return;
+            }
+            
+            // Buscar K más cercanos
+            auto startSearch = chrono::high_resolution_clock::now();
+            bst.findKClosest(x, k, closest);
+            auto endSearch = chrono::high_resolution_clock::now();
+            
+            auto buildTime = chrono::duration_cast<chrono::milliseconds>(endBuild - startBuild);
+            auto searchTime = chrono::duration_cast<chrono::milliseconds>(endSearch - startSearch);
+            
+            cout << "  - Tiempo construccion BST: " << buildTime.count() << " ms" << endl;
+            cout << "  - Tiempo busqueda K-nearest: " << searchTime.count() << " ms" << endl;
+            
+        } else {
+            // ===== OPCION 2: AVL CON ARREGLO =====
+            cout << "Estructura: AVL (Arbol Auto-Balanceado) + Arreglo Dinamico" << endl;
+            cout << "Algoritmo: Merge Sort O(N log N) + Rotaciones AVL" << endl;
+            
+            AVL<const Row*> avl;
+            
+            // Construir AVL
+            auto startBuild = chrono::high_resolution_clock::now();
+            reader.rows().for_each([&](const Row& row) {
+                string field;
+                if (row.getField(colIndex, field) && !field.empty()) {
+                    try {
+                        double value = stod(field);
+                        avl.insert(value, &row);
+                        ++validRows;
+                    } catch (...) {}
+                }
+            });
+            auto endBuild = chrono::high_resolution_clock::now();
+            
+            if (validRows == 0) {
+                cout << "No se encontraron valores numericos validos." << endl;
+                return;
+            }
+            
+            // Buscar K más cercanos
+            auto startSearch = chrono::high_resolution_clock::now();
+            avl.findKClosest(x, k, closest);
+            auto endSearch = chrono::high_resolution_clock::now();
+            
+            auto buildTime = chrono::duration_cast<chrono::milliseconds>(endBuild - startBuild);
+            auto searchTime = chrono::duration_cast<chrono::milliseconds>(endSearch - startSearch);
+            
+            cout << "  - Tiempo construccion AVL: " << buildTime.count() << " ms" << endl;
+            cout << "  - Tiempo busqueda K-nearest: " << searchTime.count() << " ms" << endl;
+            cout << "  - Altura del arbol: " << avl.getTreeHeight() << endl;
+        }
+        
+        auto endTotal = chrono::high_resolution_clock::now();
+        auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTotal - startTotal);
+        
+        cout << "\n*** TIEMPO TOTAL: " << totalTime.count() << " ms ***" << endl;
+        cout << "Registros validos procesados: " << validRows << endl;
         
         if (closest.empty()) {
             cout << "No se encontraron registros." << endl;
             return;
         }
-        
-        // Usar una pila para almacenar y luego mostrar
-        Stack<Row> resultStack;
-        closest.for_each([&](const Row& row) {
-            resultStack.push(row);
-        });
         
         // Mostrar resultados
         cout << "\n--- Resultados ---" << endl;
@@ -328,20 +398,19 @@ public:
         cout << endl;
         cout << string(80, '-') << endl;
         
-        // Desapilar y mostrar cada registro
-        Row row;
-        while (resultStack.pop(row)) {
+        // Mostrar cada registro (usando punteros - sin copias)
+        closest.for_each([&](const Row* rowPtr) {
             idx = 0;
             headers.for_each([&](const string&) {
                 string value;
-                row.getField(idx, value);
+                rowPtr->getField(idx, value);
                 if (value.length() > 14) value = value.substr(0, 11) + "...";
                 cout << left << setw(15) << value;
                 if (idx < headers.size() - 1) cout << "| ";
                 idx++;
             });
             cout << endl;
-        }
+        });
     }
 };
 
