@@ -70,6 +70,12 @@ int main() {
             case 6:
                 analyzer->reportarConteoTipos();
                 break;
+            case 7:
+                analyzer->contarFrecuenciasCategoricas();
+                break;
+            case 8:
+                analyzer->encontrarKRegistrosSimilares();
+                break;
             default:
                 cout << "Opcion invalida\n";
                 break;
