@@ -3,21 +3,20 @@
 
 #include <string>
 #include <functional>
-#include <vector>
 
 using namespace std;
 
-// Tabla Hash con separate chaining (para la opción 7)
+// Tabla Hash con separate chaining (TDA - visto en clase)
 template<typename K, typename V>
 class HashTable {
-    struct Entry {
+    struct Entry {  // struct interno para entradas - permitido en TDA
         K key;
         V value;
         Entry* next;
         Entry(const K& k, const V& v) : key(k), value(v), next(nullptr) {}
     };
 
-    vector<Entry*> table;
+    Entry** table;  // Arreglo dinámico manual (sin vector)
     size_t capacity;
     size_t count;
 
@@ -27,7 +26,11 @@ class HashTable {
 
 public:
     HashTable(size_t cap = 100) : capacity(cap), count(0) {
-        table.resize(capacity, nullptr);
+        // Arreglo dinámico manual - visto en clase (gestión dinámica de memoria)
+        table = new Entry*[capacity];
+        for (size_t i = 0; i < capacity; ++i) {
+            table[i] = nullptr;
+        }
     }
 
     ~HashTable() {
@@ -39,6 +42,7 @@ public:
                 delete temp;
             }
         }
+        delete[] table;
     }
 
     void insert(const K& key, const V& value) {

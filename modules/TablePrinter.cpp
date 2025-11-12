@@ -3,66 +3,105 @@
 
 #include <iostream>
 #include <iomanip>
-#include <vector>
 #include <string>
 #include <algorithm>
 #include "LinkedList.cpp"
+#include "Row.cpp"
 
 using namespace std;
 
 // Imprime tabla con '|' y líneas horizontales usando guiones
 class TablePrinter {
-    vector<string> hdr;
-    const LinkedList<vector<string>>& rowsRef;
+    const LinkedList<string>& hdr;
+    const LinkedList<Row>& rowsRef;
     size_t maxRows;
+    
+    // Calcula el ancho máximo para una columna
+    size_t getMaxWidth(size_t colIndex) const {
+        size_t maxWidth = 0;
+        
+        // Ancho del header
+        string headerName;
+        if (hdr.get(colIndex, headerName)) {
+            maxWidth = headerName.length();
+        }
+        
+        // Ancho de los datos
+        size_t count = 0;
+        rowsRef.for_first(maxRows, [&](const Row& row) {
+            string field;
+            if (row.getField(colIndex, field)) {
+                if (field.length() > maxWidth) {
+                    maxWidth = field.length();
+                }
+            }
+            count++;
+        });
+        
+        return maxWidth > 50 ? 50 : maxWidth; // Límite de ancho
+    }
+    
 public:
-    TablePrinter(const vector<string>& header, const LinkedList<vector<string>>& rows, size_t maxR = 10)
+    TablePrinter(const LinkedList<string>& header, const LinkedList<Row>& rows, size_t maxR = 10)
         : hdr(header), rowsRef(rows), maxRows(maxR) {}
 
     void print() const {
-        // Primera pasada: calcular número de columnas y anchos máximos sin copiar filas
-        size_t cols = hdr.size();
-        vector<size_t> widths(cols, 0);
-        for (size_t c = 0; c < hdr.size(); ++c) widths[c] = hdr[c].size();
-
-        rowsRef.for_first(maxRows, [&](const vector<string>& r){
-            if (r.size() > cols) {
-                size_t old = cols;
-                widths.resize(r.size());
-                for (size_t i = old; i < r.size(); ++i) widths[i] = 0;
-                cols = r.size();
-            }
-            for (size_t c = 0; c < r.size(); ++c) widths[c] = max(widths[c], r[c].size());
-        });
-
-        // función para imprimir separador horizontal usando guiones y '|' como bordes verticales
+        size_t numCols = hdr.size();
+        
+        // Calcular anchos usando LinkedList
+        LinkedList<size_t> widths;
+        for (size_t i = 0; i < numCols; ++i) {
+            widths.push_back(getMaxWidth(i));
+        }
+        
+        // Función para imprimir separador horizontal
         auto print_sep = [&]() {
-            cout << "|";
-            for (size_t c = 0; c < cols; ++c) cout << string(widths[c] + 2, '-') << "|";
+            cout << "+";
+            widths.for_each([](size_t width) {
+                cout << string(width + 2, '-') << "+";
+            });
             cout << "\n";
         };
-
-        // imprimir cabecera
+        
+        cout << "\n";
+        
+        // Imprimir cabecera
         print_sep();
         cout << "|";
-        for (size_t c = 0; c < cols; ++c) {
-            string cell = c < hdr.size() ? hdr[c] : string();
-            cout << ' ' << left << setw((int)widths[c]) << cell << ' ' << "|";
-        }
+        size_t colIdx = 0;
+        hdr.for_each([&](const string& colName) {
+            size_t width;
+            widths.get(colIdx, width);
+            string truncated = colName.length() > width ? 
+                             colName.substr(0, width - 3) + "..." : colName;
+            cout << " " << left << setw(width) << truncated << " |";
+            colIdx++;
+        });
         cout << "\n";
         print_sep();
-
-        // Segunda pasada: imprimir filas usando los anchos calculados
-        rowsRef.for_first(maxRows, [&](const vector<string>& r){
+        
+        // Imprimir filas
+        size_t rowCount = 0;
+        rowsRef.for_first(maxRows, [&](const Row& row) {
             cout << "|";
-            for (size_t c = 0; c < cols; ++c) {
-                string cell = c < r.size() ? r[c] : string();
-                cout << ' ' << left << setw((int)widths[c]) << cell << ' ' << "|";
+            colIdx = 0;
+            size_t fieldIdx = 0;
+            while (fieldIdx < numCols) {
+                string field;
+                row.getField(fieldIdx, field);
+                size_t width;
+                widths.get(fieldIdx, width);
+                string truncated = field.length() > width ? 
+                                 field.substr(0, width - 3) + "..." : field;
+                cout << " " << left << setw(width) << truncated << " |";
+                fieldIdx++;
             }
             cout << "\n";
-            
+            rowCount++;
         });
         print_sep();
+        
+        cout << "Mostrando " << rowCount << " de " << rowsRef.size() << " registros.\n\n";
     }
 };
 

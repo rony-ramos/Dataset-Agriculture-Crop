@@ -7,36 +7,62 @@
 
 using namespace std;
 
-static vector<string> parseCSVLine(const string& line) {
-    vector<string> result;
-    stringstream ss(line);
-    string item;
-    while(getline(ss, item, ',')) {
-        result.push_back(item);
-    }
-    return result;
-}
-
 class CSVReader : public DatasetReader {
-    vector<string> hdr;
-    LinkedList<vector<string>> data;
+private:
+    void parseLine(const string& line, Row& row) {
+        stringstream ss(line);
+        string field;
+        while (getline(ss, field, ',')) {
+            // Trim espacios al inicio y final
+            size_t start = field.find_first_not_of(" \t\r\n");
+            size_t end = field.find_last_not_of(" \t\r\n");
+            if (start != string::npos) {
+                field = field.substr(start, end - start + 1);
+            } else {
+                field = "";
+            }
+            row.addField(field);
+        }
+    }
+    
 public:
     bool load(const string& path) override {
-        ifstream ifs(path);
-        if (!ifs.is_open()) return false;
+        ifstream file(path);
+        if (!file.is_open()) return false;
+        
         string line;
-        if (getline(ifs, line)) {
+        
+        // Leer cabecera
+        if (getline(file, line)) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            hdr = parseCSVLine(line);
+            stringstream ss(line);
+            string colName;
+            while (getline(ss, colName, ',')) {
+                // Trim
+                size_t start = colName.find_first_not_of(" \t\r\n");
+                size_t end = colName.find_last_not_of(" \t\r\n");
+                if (start != string::npos) {
+                    colName = colName.substr(start, end - start + 1);
+                }
+                hdr.push_back(colName);
+            }
         }
-        while (getline(ifs, line)) {
+        
+        // Leer datos
+        while (getline(file, line)) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            data.push_back(parseCSVLine(line));
+            if (line.empty()) continue;
+            
+            Row row;
+            parseLine(line, row);
+            if (row.size() > 0) {
+                data.push_back(row);
+            }
         }
+        
+        file.close();
         return true;
     }
-    vector<string> header() const override { return hdr; }
-    const LinkedList<vector<string>>& rows() const override { return data; }
 };
 
 #endif
